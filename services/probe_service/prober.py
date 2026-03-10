@@ -1,15 +1,14 @@
-from services.probe_service.models import ProbeRequest, ProbeResponse, ProbeResult
+from datetime import datetime
 
 import httpx
-from datetime import datetime
+
+from services.probe_service.models import ProbeRequest, ProbeResponse, ProbeResult
+
 
 async def probe(request: ProbeRequest) -> ProbeResult:
 
     obj = ProbeResult(
-        probe_id=str(request.request_id),
-        request=request,
-        success=False,
-        response=None
+        probe_id=str(request.request_id), request=request, success=False, response=None
     )
 
     try:
@@ -22,7 +21,7 @@ async def probe(request: ProbeRequest) -> ProbeResult:
                 status="healthy",
                 latency=response.elapsed.total_seconds(),
                 error=None,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
             obj.success = True
     except httpx.HTTPStatusError as e:
@@ -32,7 +31,7 @@ async def probe(request: ProbeRequest) -> ProbeResult:
             status="unhealthy",
             latency=e.response.elapsed.total_seconds(),
             error=str(e),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
     except Exception as e:
         obj.response = ProbeResponse(
@@ -41,6 +40,6 @@ async def probe(request: ProbeRequest) -> ProbeResult:
             status="unhealthy",
             latency=0,
             error=str(e),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
     return obj

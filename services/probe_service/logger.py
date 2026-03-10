@@ -1,13 +1,16 @@
 import logging
 import sys
+from typing import Any
+
 import structlog
 
 from services.probe_service.config import settings
 
+
 def configure_logging() -> None:
     env = settings.env.lower()
 
-    processors = [
+    processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
@@ -15,9 +18,7 @@ def configure_logging() -> None:
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.dev.ConsoleRenderer()
-        if env == "dev"
-        else structlog.processors.JSONRenderer(),
+        structlog.dev.ConsoleRenderer() if env == "dev" else structlog.processors.JSONRenderer(),
     ]
 
     structlog.configure(
