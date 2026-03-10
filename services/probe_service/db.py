@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import aiosqlite
 
 from services.probe_service.models import ProbeResponse, ProbeResult
@@ -44,7 +46,7 @@ class DBObject:
             """,
                 (
                     result.probe_id,
-                    result.response.timestamp,
+                    result.response.timestamp.isoformat(),
                     str(result.response.target_url),
                     result.response.status_code,
                     result.response.status,
@@ -67,6 +69,6 @@ class DBObject:
                 status=results[0]["status"],
                 latency=results[0]["latency"],
                 error=results[0]["error"],
-                timestamp=results[0]["timestamp"],
+                timestamp=datetime.fromisoformat(results[0]["timestamp"]),
             )
             return [response]
