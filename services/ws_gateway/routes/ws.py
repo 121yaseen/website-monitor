@@ -27,6 +27,7 @@ async def echo(websocket: WebSocket) -> None:
                 message=data.message,
                 client_sent_at=data.client_sent_at,
                 server_received_at=datetime.now(UTC),
+                server_sent_at=datetime.now(UTC),
             )
             await websocket.send_text(response.model_dump_json())
         except WebSocketDisconnect:
