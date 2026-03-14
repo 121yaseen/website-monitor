@@ -9,9 +9,9 @@ def inspect_audio(file_path: str) -> None:
         print(f"Bit depth: {f.getsampwidth() * 8} bits")
         print(f"Duration: {f.getnframes() / f.getframerate()} seconds")
         print(f"Total samples: {f.getnframes()}")
-        print(
-            f"Chunk sizes (20ms frames): {f.getframerate() / 50} samples / {f.getframerate() / 50 * f.getsampwidth() * f.getnchannels()} bytes"
-        )
+        samples = f.getframerate() / 50
+        chunk_bytes = samples * f.getsampwidth() * f.getnchannels()
+        print(f"Chunk sizes (20ms frames): {samples} samples / {chunk_bytes} bytes")
 
 
 if __name__ == "__main__":

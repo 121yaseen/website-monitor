@@ -24,7 +24,7 @@ async def probe_loop(app: FastAPI) -> None:
         if not monitors:
             logger.info("no_active_monitors")
         for _monitor_id, url in monitors:
-            request = ProbeRequest(target_url=url, timeout_in_seconds=10)  # type: ignore[arg-type]
+            request = ProbeRequest(target_url=url, timeout_in_seconds=10)
             result = await probe(request)
             await app.state.db.save_result(result)
             if result.response is not None:

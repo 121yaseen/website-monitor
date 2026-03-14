@@ -1,5 +1,6 @@
 import os
 import tempfile
+from collections.abc import AsyncGenerator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -9,7 +10,7 @@ from services.api_service.main import app
 
 
 @pytest.fixture
-async def client():
+async def client() -> AsyncGenerator[AsyncClient, None]:
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
     app.state.db = await APIDBObject.get_db_object(db_path)

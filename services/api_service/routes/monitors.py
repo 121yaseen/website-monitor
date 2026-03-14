@@ -1,13 +1,13 @@
 import json
 import uuid
 from datetime import datetime
+from typing import cast
 
 import httpx
 import websockets
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from services.api_service.config import settings
 from services.api_service.models import MonitorCreate, MonitorWithStatus
 
 router = APIRouter(prefix="/monitors")
@@ -17,7 +17,7 @@ WS_INGEST_URL = "ws://localhost:8000/ws/ingest"
 
 @router.get("")
 async def list_monitors(request: Request) -> list[MonitorWithStatus]:
-    return await request.app.state.db.list_monitors()
+    return cast(list[MonitorWithStatus], await request.app.state.db.list_monitors())
 
 
 @router.post("", status_code=201)
@@ -27,8 +27,10 @@ async def add_monitor(request: Request, body: MonitorCreate) -> JSONResponse:
         monitor = await request.app.state.db.add_monitor(url)
     except Exception as e:
         if "UNIQUE constraint failed" in str(e):
-            raise HTTPException(status_code=409, detail="Monitor for this URL already exists")
-        raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=409, detail="Monitor for this URL already exists"
+            ) from None
+        raise HTTPException(status_code=500, detail=str(e)) from e
     return JSONResponse(monitor.model_dump(mode="json"), status_code=201)
 
 
