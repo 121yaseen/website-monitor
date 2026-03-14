@@ -45,9 +45,7 @@ class DBObject:
         """Return list of (id, url) for all active (non-paused) monitors."""
         async with aiosqlite.connect(self.connection_string) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                "SELECT id, url FROM monitors WHERE is_active = 1"
-            )
+            cursor = await db.execute("SELECT id, url FROM monitors WHERE is_active = 1")
             rows = await cursor.fetchall()
             return [(row["id"], row["url"]) for row in rows]
 
