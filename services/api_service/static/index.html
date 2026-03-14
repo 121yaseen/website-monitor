@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>isalive — URL Monitor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222536;
+      --border: #2e3148;
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --blue: #3b82f6;
+      --accent: #6366f1;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .logo { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .logo span { color: var(--accent); }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .ws-indicator {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--muted);
+    }
+    .ws-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); transition: background 0.3s;
+    }
+    .ws-dot.connected { background: var(--green); }
+
+    button {
+      cursor: pointer; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 500; transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.85; }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+      padding: 8px 16px;
+    }
+    .btn-ghost {
+      background: transparent; color: var(--muted);
+      padding: 6px 10px; border: 1px solid var(--border);
+    }
+    .btn-danger {
+      background: transparent; color: var(--red);
+      padding: 5px 10px; border: 1px solid #3f1f1f; font-size: 12px;
+    }
+    .btn-pause {
+      background: transparent; color: var(--muted);
+      padding: 5px 10px; border: 1px solid var(--border); font-size: 12px;
+    }
+    .btn-check {
+      background: transparent; color: var(--blue);
+      padding: 5px 10px; border: 1px solid #1e3a5f; font-size: 12px;
+    }
+    .btn-check:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Main ── */
+    main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .section-title { font-size: 16px; font-weight: 600; }
+    .count-badge {
+      background: var(--surface2); color: var(--muted);
+      font-size: 12px; padding: 2px 8px; border-radius: 12px;
+      margin-left: 8px;
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center; padding: 64px 24px;
+      color: var(--muted); border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty p { margin-bottom: 16px; }
+
+    /* ── Cards grid ── */
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; position: relative;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: #3e4264; }
+    .card.paused { opacity: 0.6; }
+    .card.flash-green { animation: flash-g 0.6s ease; }
+    .card.flash-red   { animation: flash-r 0.6s ease; }
+    @keyframes flash-g { 0%,100%{border-color:var(--border)} 50%{border-color:var(--green)} }
+    @keyframes flash-r { 0%,100%{border-color:var(--border)} 50%{border-color:var(--red)} }
+
+    .card-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; margin-bottom: 10px;
+    }
+    .card-url {
+      font-size: 13px; font-weight: 600; word-break: break-all;
+      max-width: 200px; color: var(--text);
+    }
+    .status-badge {
+      font-size: 11px; font-weight: 600; padding: 3px 8px;
+      border-radius: 20px; white-space: nowrap;
+    }
+    .badge-up     { background: #14532d; color: var(--green); }
+    .badge-down   { background: #450a0a; color: var(--red); }
+    .badge-paused { background: #292524; color: var(--yellow); }
+    .badge-pending{ background: var(--surface2); color: var(--muted); }
+
+    .latency {
+      font-size: 28px; font-weight: 700; margin: 8px 0 2px;
+      font-variant-numeric: tabular-nums;
+    }
+    .latency.good   { color: var(--green); }
+    .latency.warn   { color: var(--yellow); }
+    .latency.bad    { color: var(--red); }
+    .latency.none   { color: var(--muted); font-size: 22px; }
+
+    .meta { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+
+    /* ── Sparkline ── */
+    .sparkline {
+      display: flex; align-items: flex-end; gap: 2px;
+      height: 28px; margin-bottom: 12px;
+    }
+    .spark-bar {
+      flex: 1; max-width: 12px; border-radius: 2px;
+      transition: height 0.3s;
+    }
+
+    /* ── Card actions ── */
+    .card-actions { display: flex; gap: 6px; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px; width: 420px; max-width: 90vw;
+    }
+    .modal h2 { font-size: 16px; margin-bottom: 16px; }
+    .modal input {
+      width: 100%; padding: 10px 14px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--text); font-size: 14px; outline: none;
+      margin-bottom: 8px;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal-error { color: var(--red); font-size: 12px; min-height: 18px; margin-bottom: 10px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 16px; font-size: 13px;
+      opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 200;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">is<span>alive</span></div>
+  <div class="header-right">
+    <div class="ws-indicator">
+      <div class="ws-dot" id="wsDot"></div>
+      <span id="wsLabel">Connecting…</span>
+    </div>
+    <button class="btn-primary" onclick="openModal()">+ Add Monitor</button>
+  </div>
+</header>
+
+<main>
+  <div class="section-header">
+    <div style="display:flex;align-items:center;">
+      <span class="section-title">Monitors</span>
+      <span class="count-badge" id="countBadge">0</span>
+    </div>
+  </div>
+
+  <div id="cards" class="cards"></div>
+  <div id="empty" class="empty" style="display:none;">
+    <div class="empty-icon">📡</div>
+    <p>No monitors yet. Add a URL to start watching.</p>
+    <button class="btn-primary" onclick="openModal()">+ Add your first monitor</button>
+  </div>
+</main>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeOnOverlay(event)">
+  <div class="modal">
+    <h2>Add Monitor</h2>
+    <input type="url" id="urlInput" placeholder="https://example.com" autocomplete="off" />
+    <div class="modal-error" id="modalError"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" id="submitBtn" onclick="submitMonitor()">Add</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const API = '';          // same origin
+  const WS_URL = 'ws://localhost:8000/ws/updates';
+
+  let monitors = [];       // { id, url, is_active, latest, history }
+  let ws = null;
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+
+  function toast(msg, duration = 2500) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), duration);
+  }
+
+  function timeAgo(isoStr) {
+    if (!isoStr) return '—';
+    const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000);
+    if (diff < 5)  return 'just now';
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    return `${Math.floor(diff/3600)}h ago`;
+  }
+
+  function fmtLatency(ms) {
+    if (ms == null) return '—';
+    return ms >= 1000 ? `${(ms/1000).toFixed(2)}s` : `${Math.round(ms * 1000)}ms`;
+  }
+
+  function latencyClass(ms) {
+    if (ms == null) return 'none';
+    const millis = ms * 1000;
+    if (millis < 300) return 'good';
+    if (millis < 1000) return 'warn';
+    return 'bad';
+  }
+
+  function sparkColor(status) {
+    return status === 'healthy' ? 'var(--green)' : 'var(--red)';
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  function renderCards() {
+    const container = document.getElementById('cards');
+    const empty = document.getElementById('empty');
+    const badge = document.getElementById('countBadge');
+
+    badge.textContent = monitors.length;
+
+    if (monitors.length === 0) {
+      container.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    // Build a map of existing cards to reuse them (avoid full re-render on WS update)
+    const existing = {};
+    container.querySelectorAll('.card[data-id]').forEach(el => {
+      existing[el.dataset.id] = el;
+    });
+
+    const newIds = new Set(monitors.map(m => m.id));
+
+    // Remove stale cards
+    Object.keys(existing).forEach(id => {
+      if (!newIds.has(id)) existing[id].remove();
+    });
+
+    monitors.forEach((m, idx) => {
+      const card = buildCard(m);
+      if (existing[m.id]) {
+        existing[m.id].replaceWith(card);
+      } else {
+        // Insert at correct position
+        const children = container.children;
+        if (idx < children.length) {
+          container.insertBefore(card, children[idx]);
+        } else {
+          container.appendChild(card);
+        }
+      }
+    });
+  }
+
+  function buildCard(m) {
+    const el = document.createElement('div');
+    el.className = 'card' + (m.is_active ? '' : ' paused');
+    el.dataset.id = m.id;
+
+    const latest = m.latest || {};
+    const isDown = latest.status === 'unhealthy';
+    const isPaused = !m.is_active;
+
+    let badgeClass = 'badge-pending';
+    let badgeText = 'PENDING';
+    if (isPaused) { badgeClass = 'badge-paused'; badgeText = 'PAUSED'; }
+    else if (latest.status === 'healthy') { badgeClass = 'badge-up'; badgeText = 'UP'; }
+    else if (latest.status === 'unhealthy') { badgeClass = 'badge-down'; badgeText = 'DOWN'; }
+
+    const latDisplay = isDown ? '—' : fmtLatency(latest.latency);
+    const latCls = isDown ? 'none' : latencyClass(latest.latency);
+    const checkedAt = latest.checked_at ? timeAgo(latest.checked_at) : 'Not yet probed';
+
+    // Sparkline: last 20 bars, oldest left
+    const hist = (m.history || []).slice().reverse();  // oldest first
+    const bars = Array.from({length: 20}, (_, i) => {
+      const h = hist[i];
+      if (!h) return `<div class="spark-bar" style="height:4px;background:var(--border)"></div>`;
+      const pct = h.latency ? Math.min(100, Math.max(10, h.latency * 1000 / 15)) : 100;
+      return `<div class="spark-bar" style="height:${pct}%;background:${sparkColor(h.status)}"></div>`;
+    }).join('');
+
+    const shortUrl = m.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const pauseLabel = m.is_active ? '⏸ Pause' : '▶ Resume';
+
+    el.innerHTML = `
+      <div class="card-top">
+        <div class="card-url" title="${m.url}">${shortUrl}</div>
+        <span class="status-badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <div class="latency ${latCls}">${latDisplay}</div>
+      <div class="meta">Checked ${checkedAt}${isDown && latest.error ? ' · ' + latest.error : ''}</div>
+      <div class="sparkline">${bars}</div>
+      <div class="card-actions">
+        <button class="btn-check" id="check-${m.id}" onclick="forceCheck('${m.id}')">⚡ Check Now</button>
+        <button class="btn-pause" onclick="togglePause('${m.id}')">${pauseLabel}</button>
+        <button class="btn-danger" onclick="deleteMonitor('${m.id}')">🗑 Delete</button>
+      </div>
+    `;
+    return el;
+  }
+
+  // ── API calls ──────────────────────────────────────────────────────────────
+
+  async function loadMonitors() {
+    const res = await fetch(`${API}/monitors`);
+    monitors = await res.json();
+    renderCards();
+  }
+
+  async function submitMonitor() {
+    const input = document.getElementById('urlInput');
+    const errEl = document.getElementById('modalError');
+    const url = input.value.trim();
+    errEl.textContent = '';
+
+    if (!url) { errEl.textContent = 'Please enter a URL.'; return; }
+
+    const btn = document.getElementById('submitBtn');
+    btn.textContent = 'Adding…';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(`${API}/monitors`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url}),
+      });
+      if (res.status === 409) { errEl.textContent = 'This URL is already monitored.'; return; }
+      if (!res.ok) { errEl.textContent = 'Failed to add monitor.'; return; }
+      const monitor = await res.json();
+      monitors.unshift({...monitor, latest: null, history: []});
+      renderCards();
+      closeModal();
+      toast('Monitor added');
+    } finally {
+      btn.textContent = 'Add';
+      btn.disabled = false;
+    }
+  }
+
+  async function forceCheck(id) {
+    const btn = document.getElementById(`check-${id}`);
+    if (btn) { btn.textContent = '…'; btn.disabled = true; }
+    try {
+      const res = await fetch(`${API}/monitors/${id}/check`, {method: 'POST'});
+      if (!res.ok) { toast('Check failed'); return; }
+      const data = await res.json();
+      const result = {
+        status: data.status,
+        status_code: data.status_code,
+        latency: data.latency,
+        error: data.error || null,
+        checked_at: data.timestamp,
+      };
+      monitors = monitors.map(m => {
+        if (m.id === id) {
+          const history = [result, ...(m.history || [])].slice(0, 20);
+          return {...m, latest: result, history};
+        }
+        return m;
+      });
+      renderCards();
+      // Flash the card
+      const card = document.querySelector(`.card[data-id="${id}"]`);
+      if (card) {
+        const cls = result.status === 'healthy' ? 'flash-green' : 'flash-red';
+        card.classList.add(cls);
+        setTimeout(() => card.classList.remove(cls), 700);
+      }
+      toast(result.status === 'healthy' ? '✓ Up' : '✗ Down');
+    } finally {
+      // Button is re-rendered by renderCards(); nothing to restore here
+    }
+  }
+
+  async function deleteMonitor(id) {
+    if (!confirm('Delete this monitor?')) return;
+    await fetch(`${API}/monitors/${id}`, {method: 'DELETE'});
+    monitors = monitors.filter(m => m.id !== id);
+    renderCards();
+    toast('Monitor deleted');
+  }
+
+  async function togglePause(id) {
+    const res = await fetch(`${API}/monitors/${id}/pause`, {method: 'PATCH'});
+    const updated = await res.json();
+    monitors = monitors.map(m => m.id === id ? {...m, ...updated} : m);
+    renderCards();
+    toast(updated.is_active ? 'Monitor resumed' : 'Monitor paused');
+  }
+
+  // ── WebSocket ──────────────────────────────────────────────────────────────
+
+  function connectWS() {
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      document.getElementById('wsDot').classList.add('connected');
+      document.getElementById('wsLabel').textContent = 'Live';
+    };
+
+    ws.onclose = () => {
+      document.getElementById('wsDot').classList.remove('connected');
+      document.getElementById('wsLabel').textContent = 'Reconnecting…';
+      setTimeout(connectWS, 3000);
+    };
+
+    ws.onerror = () => ws.close();
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // data is a ProbeResponse: { target_url, status, status_code, latency, error, timestamp }
+        const url = data.target_url;
+        const result = {
+          status: data.status,
+          status_code: data.status_code,
+          latency: data.latency,
+          error: data.error || null,
+          checked_at: data.timestamp,
+        };
+
+        let matched = false;
+        monitors = monitors.map(m => {
+          // Normalize both URLs for comparison
+          const mUrl = m.url.replace(/\/$/, '');
+          const dUrl = url.replace(/\/$/, '');
+          if (mUrl === dUrl) {
+            matched = true;
+            const history = [result, ...(m.history || [])].slice(0, 20);
+            return {...m, latest: result, history};
+          }
+          return m;
+        });
+
+        if (matched) {
+          renderCards();
+          // Flash the matching card
+          const card = document.querySelector(`.card[data-id]`);
+          monitors.forEach(m => {
+            const mUrl = m.url.replace(/\/$/, '');
+            const dUrl = url.replace(/\/$/, '');
+            if (mUrl === dUrl) {
+              const el = document.querySelector(`.card[data-id="${m.id}"]`);
+              if (el) {
+                const cls = result.status === 'healthy' ? 'flash-green' : 'flash-red';
+                el.classList.add(cls);
+                setTimeout(() => el.classList.remove(cls), 700);
+              }
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('WS parse error', e);
+      }
+    };
+  }
+
+  // ── Modal ──────────────────────────────────────────────────────────────────
+
+  function openModal() {
+    document.getElementById('urlInput').value = '';
+    document.getElementById('modalError').textContent = '';
+    document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('urlInput').focus(), 50);
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+
+  function closeOnOverlay(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  }
+
+  document.getElementById('urlInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitMonitor();
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // ── Relative time refresh ──────────────────────────────────────────────────
+  setInterval(() => {
+    document.querySelectorAll('.meta').forEach(el => {
+      // Re-render meta text in place using stored data
+    });
+    // Re-render all cards to keep "Xs ago" fresh
+    if (monitors.length) renderCards();
+  }, 15000);
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  loadMonitors();
+  connectWS();
+</script>
+</body>
+</html>

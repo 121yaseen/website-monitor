@@ -14,6 +14,33 @@ logger = structlog.get_logger("ws_gateway.routes.ws")
 router = APIRouter()
 
 
+class ConnectionManager:
+    def __init__(self) -> None:
+        self._clients: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self._clients.append(websocket)
+        logger.info("browser_client_connected", total=len(self._clients))
+
+    def disconnect(self, websocket: WebSocket) -> None:
+        self._clients.remove(websocket)
+        logger.info("browser_client_disconnected", total=len(self._clients))
+
+    async def broadcast(self, message: str) -> None:
+        dead: list[WebSocket] = []
+        for client in self._clients:
+            try:
+                await client.send_text(message)
+            except Exception:
+                dead.append(client)
+        for client in dead:
+            self._clients.remove(client)
+
+
+manager = ConnectionManager()
+
+
 @router.websocket("/ws/echo")
 async def echo(websocket: WebSocket) -> None:
     session_id = str(uuid.uuid4())
@@ -35,3 +62,27 @@ async def echo(websocket: WebSocket) -> None:
         except ValidationError as e:
             await websocket.send_text(json.dumps({"error": str(e)}))
             continue
+
+
+@router.websocket("/ws/ingest")
+async def ingest(websocket: WebSocket) -> None:
+    """Probe service connects here to push results; we broadcast to all browser clients."""
+    await websocket.accept()
+    logger.info("probe_service_connected")
+    try:
+        while True:
+            message = await websocket.receive_text()
+            await manager.broadcast(message)
+    except WebSocketDisconnect:
+        logger.info("probe_service_disconnected")
+
+
+@router.websocket("/ws/updates")
+async def updates(websocket: WebSocket) -> None:
+    """Browser clients connect here to receive live probe results."""
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # keep alive; ignore client messages
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)

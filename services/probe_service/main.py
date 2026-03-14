@@ -20,11 +20,15 @@ logger = structlog.get_logger("probe_service")
 
 async def probe_loop(app: FastAPI) -> None:
     while True:
-        request = ProbeRequest(target_url="https://www.hinoun.com/", timeout_in_seconds=10)
-        result = await probe(request)
-        await app.state.db.save_result(result)
-        if result.response is not None:
-            app.state.publisher.publish(result.response)
+        monitors = await app.state.db.get_active_monitors()
+        if not monitors:
+            logger.info("no_active_monitors")
+        for _monitor_id, url in monitors:
+            request = ProbeRequest(target_url=url, timeout_in_seconds=10)  # type: ignore[arg-type]
+            result = await probe(request)
+            await app.state.db.save_result(result)
+            if result.response is not None:
+                app.state.publisher.publish(result.response)
         await asyncio.sleep(settings.probe_interval)
 
 

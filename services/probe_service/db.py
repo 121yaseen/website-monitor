@@ -31,7 +31,25 @@ class DBObject:
                 error TEXT
             )
             """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS monitors (
+                id TEXT PRIMARY KEY,
+                url TEXT NOT NULL UNIQUE,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+            """)
             await db.commit()
+
+    async def get_active_monitors(self) -> list[tuple[str, str]]:
+        """Return list of (id, url) for all active (non-paused) monitors."""
+        async with aiosqlite.connect(self.connection_string) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT id, url FROM monitors WHERE is_active = 1"
+            )
+            rows = await cursor.fetchall()
+            return [(row["id"], row["url"]) for row in rows]
 
     async def save_result(self, result: ProbeResult) -> None:
         if result.response is None:
