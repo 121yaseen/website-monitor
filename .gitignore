@@ -44,3 +44,9 @@ htmlcov/
 .ruff_cache/
 
 data/
+
+.superpowers/
+
+learning_plan/
+
+docs/
