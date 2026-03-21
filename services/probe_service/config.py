@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     probe_interval: int = 60
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", env_prefix="PROBE_"
+        env_file=".env", env_file_encoding="utf-8", env_prefix="PROBE_", extra="ignore",
     )
 
 
