@@ -46,6 +46,14 @@ class ErrorEvent(BaseModel):
     message: str
 
 
+class CompletedUtterance(BaseModel):
+    utterance_id: str
+    text: str
+    first_audio_ts: float
+    first_partial_ts: float | None
+    final_ts: float
+
+
 class SessionState(BaseModel):
     session_id: str
     utterance_id: str | None = None
@@ -57,3 +65,6 @@ class SessionState(BaseModel):
     first_audio_ts: float | None = None
     first_partial_ts: float | None = None
     final_ts: float | None = None
+    committed: bool = True
+    utterance_count: int = 0
+    completed_utterances: list[CompletedUtterance] = []

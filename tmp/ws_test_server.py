@@ -22,6 +22,13 @@ async def test():
                 async for msg in ws:
                     data = json.loads(msg)
                     print(f"← {data['type']}: {data.get('text', data)}")
+                    if data["type"] == "transcript.final":
+                        print(
+                            "First Word Latency: ",
+                            data["first_partial_ts"] - data["first_audio_ts"],
+                        )
+
+                        print(f"Final Event: {data}")
             except websockets.ConnectionClosed:
                 pass
 

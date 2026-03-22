@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from services.stt_gateway.config import settings
 from services.stt_gateway.models import (
+    CompletedUtterance,
     ErrorEvent,
     SessionEndEvent,
     SessionStartEvent,
@@ -25,11 +26,16 @@ router = APIRouter()
 
 def _make_partial_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Awaitable[None]]:
     async def handle_partial(text: str) -> None:
+        if s.committed:
+            s.utterance_count += 1
+            s.committed = False
+            s.utterance_id = f"utt-{s.utterance_count}"
+            s.first_partial_ts = datetime.now().timestamp()
         event = TranscriptPartialEvent(
             type="transcript.partial",
             text=text,
             session_id=s.session_id,
-            utterance_id=s.utterance_id or "utt-1",
+            utterance_id=s.utterance_id,
         )
         await ws.send_text(event.model_dump_json())
 
@@ -38,6 +44,9 @@ def _make_partial_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Awa
 
 def _make_final_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Awaitable[None]]:
     async def handle_final(text: str) -> None:
+        if s.committed:
+            print("committed is true, skipping the final")
+            return
         event = TranscriptFinalEvent(
             type="transcript.final",
             text=text,
@@ -47,6 +56,16 @@ def _make_final_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Await
             first_partial_ts=s.first_partial_ts,
             final_ts=datetime.now().timestamp(),
         )
+        s.completed_utterances.append(
+            CompletedUtterance(
+                utterance_id=s.utterance_id,
+                text=text,
+                first_audio_ts=s.first_audio_ts,
+                first_partial_ts=s.first_partial_ts,
+                final_ts=datetime.now().timestamp(),
+            )
+        )
+        s.committed = True
         await ws.send_text(event.model_dump_json())
 
     return handle_final
