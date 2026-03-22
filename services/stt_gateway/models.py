@@ -37,6 +37,7 @@ class TranscriptFinalEvent(BaseModel):
     first_audio_ts: float
     first_partial_ts: float | None
     final_ts: float
+    last_partial_ts: float | None
 
 
 class ErrorEvent(BaseModel):
@@ -65,6 +66,7 @@ class SessionState(BaseModel):
     first_audio_ts: float | None = None
     first_partial_ts: float | None = None
     final_ts: float | None = None
+    last_partial_ts: float | None = None
     committed: bool = True
     utterance_count: int = 0
     completed_utterances: list[CompletedUtterance] = []

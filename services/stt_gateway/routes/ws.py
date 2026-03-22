@@ -31,6 +31,7 @@ def _make_partial_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Awa
             s.committed = False
             s.utterance_id = f"utt-{s.utterance_count}"
             s.first_partial_ts = datetime.now().timestamp()
+        s.last_partial_ts = datetime.now().timestamp()
         event = TranscriptPartialEvent(
             type="transcript.partial",
             text=text,
@@ -42,7 +43,9 @@ def _make_partial_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Awa
     return handle_partial
 
 
-def _make_final_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Awaitable[None]]:
+def _make_final_handler(
+    s: SessionState, ws: WebSocket
+) -> Callable[[str], Awaitable[None]]:
     async def handle_final(text: str) -> None:
         if s.committed:
             print("committed is true, skipping the final")
@@ -55,17 +58,28 @@ def _make_final_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Await
             first_audio_ts=s.first_audio_ts or 0.0,
             first_partial_ts=s.first_partial_ts,
             final_ts=datetime.now().timestamp(),
+            last_partial_ts=s.last_partial_ts,
         )
+        s.final_ts = event.final_ts
         s.completed_utterances.append(
             CompletedUtterance(
                 utterance_id=s.utterance_id,
                 text=text,
                 first_audio_ts=s.first_audio_ts,
                 first_partial_ts=s.first_partial_ts,
-                final_ts=datetime.now().timestamp(),
+                final_ts=event.final_ts,
             )
         )
         s.committed = True
+        logger.info(
+            "utterance_committed",
+            utterance_id=s.utterance_id,
+            first_word_latency=s.first_partial_ts - s.first_audio_ts,
+            total_utterance_latency=s.final_ts - s.first_audio_ts,
+            utterance_duration=s.final_ts - s.first_partial_ts,
+            provider_response_delay=s.final_ts - s.last_partial_ts,
+        )
+
         await ws.send_text(event.model_dump_json())
 
     return handle_final
