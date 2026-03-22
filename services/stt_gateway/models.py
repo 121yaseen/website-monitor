@@ -70,3 +70,5 @@ class SessionState(BaseModel):
     committed: bool = True
     utterance_count: int = 0
     completed_utterances: list[CompletedUtterance] = []
+    last_chunk_ts: float | None = None
+    event_log: list[dict[str, object]] = []

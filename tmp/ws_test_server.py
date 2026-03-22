@@ -7,6 +7,7 @@ import websockets
 
 utterances = []
 
+
 def compute_metrics(utterances: list[dict]) -> dict:
     """Compute latency metrics with count, avg, p50, p95 from final events."""
     if not utterances:
@@ -55,13 +56,14 @@ def compute_metrics(utterances: list[dict]) -> dict:
 
 async def test():
     uri = "ws://localhost:8001/ws/audio"
-    with wave.open("data/harvard.wav", "rb") as wf:
+    with wave.open("data/TEDxMileHigh.wav", "rb") as wf:
         sample_rate = wf.getframerate()
         channels = wf.getnchannels()
         pcm_data = wf.readframes(wf.getnframes())
         print(f"Audio: {sample_rate}Hz, {channels}ch, {len(pcm_data)} bytes")
 
     async with websockets.connect(uri) as ws:
+
         async def listen():
             try:
                 async for msg in ws:
@@ -101,8 +103,7 @@ async def test():
         listener.cancel()
 
 
-
-for i in range(4):
+for i in range(1):
     try:
         print(f"\n{'=' * 60}\nRUN {i + 1}\n{'=' * 60}")
         asyncio.run(test())
@@ -119,4 +120,4 @@ print(json.dumps(metrics, indent=2))
 # Save to file
 with open("data/metrics_sample.json", "w") as f:
     json.dump(metrics, f, indent=2)
-print(f"\nMetrics saved to data/metrics_sample.json")
+print("\nMetrics saved to data/metrics_sample.json")

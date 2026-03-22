@@ -31,6 +31,7 @@ def _make_partial_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Awa
             s.committed = False
             s.utterance_id = f"utt-{s.utterance_count}"
             s.first_partial_ts = datetime.now().timestamp()
+            s.first_audio_ts = s.last_chunk_ts
         s.last_partial_ts = datetime.now().timestamp()
         event = TranscriptPartialEvent(
             type="transcript.partial",
@@ -38,14 +39,13 @@ def _make_partial_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Awa
             session_id=s.session_id,
             utterance_id=s.utterance_id,
         )
+        s.event_log.append(event.model_dump())
         await ws.send_text(event.model_dump_json())
 
     return handle_partial
 
 
-def _make_final_handler(
-    s: SessionState, ws: WebSocket
-) -> Callable[[str], Awaitable[None]]:
+def _make_final_handler(s: SessionState, ws: WebSocket) -> Callable[[str], Awaitable[None]]:
     async def handle_final(text: str) -> None:
         if s.committed:
             print("committed is true, skipping the final")
@@ -71,6 +71,9 @@ def _make_final_handler(
             )
         )
         s.committed = True
+        assert s.first_partial_ts is not None
+        assert s.first_audio_ts is not None
+        assert s.last_partial_ts is not None
         logger.info(
             "utterance_committed",
             utterance_id=s.utterance_id,
@@ -79,6 +82,7 @@ def _make_final_handler(
             utterance_duration=s.final_ts - s.first_partial_ts,
             provider_response_delay=s.final_ts - s.last_partial_ts,
         )
+        s.event_log.append(event.model_dump())
 
         await ws.send_text(event.model_dump_json())
 
@@ -116,13 +120,30 @@ async def audio(websocket: WebSocket) -> None:
                             channels=start_event.channels,
                             encoding=start_event.encoding,
                         )
+                        session.event_log.append(start_event.model_dump())
 
                         provider = AzureSpeechProvider(settings.subscription_key, settings.endpoint)
                         provider.on_partial(_make_partial_handler(session, websocket))
                         provider.on_final(_make_final_handler(session, websocket))
-                        await provider.connect(
-                            session.sample_rate, session.channels, session.encoding
-                        )
+                        try:
+                            await provider.connect(
+                                session.sample_rate, session.channels, session.encoding
+                            )
+                        except Exception as e:
+                            logger.error(
+                                "Failed to connect to provider",
+                                session_id=session.session_id,
+                                error=str(e),
+                            )
+                            await websocket.send_text(
+                                ErrorEvent(
+                                    type="error",
+                                    session_id=session.session_id,
+                                    code="PROVIDER_CONNECTION_FAILED",
+                                    message=str(e),
+                                ).model_dump_json()
+                            )
+                            break
 
                     elif message_type == "session.end":
                         SessionEndEvent.model_validate(data)
@@ -136,6 +157,7 @@ async def audio(websocket: WebSocket) -> None:
                                 chunk_count=session.chunk_count,
                                 total_bytes=session.total_bytes,
                             )
+                            session.event_log.append(data)
                         break
 
                 elif "bytes" in message:
@@ -154,6 +176,7 @@ async def audio(websocket: WebSocket) -> None:
 
                     session.total_bytes += len(audio_data)
                     session.chunk_count += 1
+                    session.last_chunk_ts = datetime.now().timestamp()
                     if session.first_audio_ts is None:
                         session.first_audio_ts = datetime.now().timestamp()
                     logger.info(
@@ -162,6 +185,16 @@ async def audio(websocket: WebSocket) -> None:
                         seq=session.chunk_count,
                         size=len(audio_data),
                     )
+                    if session.chunk_count == 1 or session.chunk_count % 10 == 0:
+                        session.event_log.append(
+                            {
+                                "type": "audio_chunk_received",
+                                "session_id": session.session_id,
+                                "seq": session.chunk_count,
+                                "size": len(audio_data),
+                                "timestamp": datetime.now().timestamp(),
+                            }
+                        )
 
                     if provider:
                         await provider.send_audio(audio_data)
@@ -180,6 +213,24 @@ async def audio(websocket: WebSocket) -> None:
             "Browser disconnected",
             session_id=session.session_id if session else None,
         )
+        if session:
+            logger.info(
+                "session_ended",
+                session_id=session.session_id,
+                chunk_count=session.chunk_count,
+                total_bytes=session.total_bytes,
+                completed_utterances=len(session.completed_utterances),
+            )
+            session.event_log.append(
+                {
+                    "type": "session_ended",
+                    "session_id": session.session_id,
+                    "chunk_count": session.chunk_count,
+                    "total_bytes": session.total_bytes,
+                    "completed_utterances": len(session.completed_utterances),
+                    "timestamp": datetime.now().timestamp(),
+                }
+            )
     except Exception as e:
         logger.error(
             "Error in WebSocket",
@@ -191,4 +242,7 @@ async def audio(websocket: WebSocket) -> None:
             await provider.close()
         if session:
             logger.info("Closing session", session_id=session.session_id)
+            logger.info(
+                "session_event_log", session_id=session.session_id, events=session.event_log
+            )
             session = None
