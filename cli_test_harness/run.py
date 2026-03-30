@@ -13,16 +13,14 @@ Set AGENT_WS_URL if the orchestrator is not on localhost:8004.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import os
-import sys
 import time
 import uuid
-import argparse
 
 import websockets
-
 
 AGENT_WS_URL = os.getenv("AGENT_WS_URL", "ws://localhost:8004/ws/agent")
 
@@ -31,9 +29,7 @@ async def run(session_id: str, text: str, barge_in_after: float | None = None) -
     print(f"Connecting to {AGENT_WS_URL} ...")
     async with websockets.connect(AGENT_WS_URL) as ws:
         # Start session
-        await ws.send(
-            json.dumps({"type": "session.start", "session_id": session_id})
-        )
+        await ws.send(json.dumps({"type": "session.start", "session_id": session_id}))
         print(f"[→] session.start  session_id={session_id}")
 
         now = time.time()
@@ -59,7 +55,7 @@ async def run(session_id: str, text: str, barge_in_after: float | None = None) -
             while True:
                 try:
                     msg = await asyncio.wait_for(ws.recv(), timeout=15.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     print("[!] Timeout waiting for response")
                     break
 
@@ -67,7 +63,11 @@ async def run(session_id: str, text: str, barge_in_after: float | None = None) -
                     audio_chunks_received += 1
                     print(f"[←] <binary audio chunk #{audio_chunks_received}  {len(msg)} bytes>")
                     # Barge-in simulation
-                    if barge_in_after and audio_chunks_received >= barge_in_after and not barge_in_sent:
+                    if (
+                        barge_in_after
+                        and audio_chunks_received >= barge_in_after
+                        and not barge_in_sent
+                    ):
                         barge_in_sent = True
                         await ws.send(
                             json.dumps({"type": "user.barge_in", "session_id": session_id})
@@ -76,13 +76,17 @@ async def run(session_id: str, text: str, barge_in_after: float | None = None) -
                 else:
                     data = json.loads(msg)
                     print(f"[←] {data.get('type', '?')}  {json.dumps(data, indent=2)}")
-                    if data.get("type") in ("assistant.audio.completed", "assistant.interrupted", "error"):
+                    if data.get("type") in (
+                        "assistant.audio.completed",
+                        "assistant.interrupted",
+                        "error",
+                    ):
                         break
 
         await listen()
 
         await ws.send(json.dumps({"type": "session.end", "session_id": session_id}))
-        print(f"[→] session.end")
+        print("[→] session.end")
         print(f"\nDone. Received {audio_chunks_received} audio chunk(s).")
 
 

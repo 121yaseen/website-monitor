@@ -22,9 +22,7 @@ class StubLLMAdapter(LLMAdapter):
         logger.info("stub_llm_complete", turn_count=len(turns))
         return self._response
 
-    async def stream(
-        self, system_prompt: str, turns: list[Turn]
-    ) -> AsyncGenerator[str, None]:
+    async def stream(self, system_prompt: str, turns: list[Turn]) -> AsyncGenerator[str, None]:
         for word in self._response.split():
             yield word + " "
 

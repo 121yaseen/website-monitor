@@ -11,12 +11,9 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
-from collections.abc import AsyncGenerator
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -30,7 +27,6 @@ from services.agent_orchestrator.models import (
     UserFinalTranscriptEvent,
 )
 from services.agent_orchestrator.orchestrator import Orchestrator
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -78,7 +74,8 @@ class FakeWebSocket:
         self.binary_frames.append(data)
 
     def last_json(self) -> dict[str, Any]:
-        return json.loads(self.text_frames[-1])
+        result: dict[str, Any] = json.loads(self.text_frames[-1])
+        return result
 
     def all_event_types(self) -> list[str]:
         return [json.loads(f).get("type") for f in self.text_frames]
@@ -104,6 +101,9 @@ class TestSessionMemory:
         session = make_session()
         session.transition("listening")
         assert session.state == "listening"
+
+    def test_state_transitions_to_thinking(self) -> None:
+        session = make_session()
         session.transition("thinking")
         assert session.state == "thinking"
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
+from typing import cast
 
 import structlog
 
@@ -33,16 +34,16 @@ def _percentile(values: list[float], pct: float) -> float | None:
 
 class MetricsCollector:
     def __init__(self) -> None:
-        self._records: list[dict[str, float | None]] = []
+        self._records: list[dict[str, float | str | None]] = []
 
     def record(self, turn_id: str, metrics: TurnLatencyMetrics) -> None:
-        row: dict[str, float | None | str] = {"turn_id": turn_id}
+        row: dict[str, float | str | None] = {"turn_id": turn_id}
         row["stt_latency"] = metrics.stt_latency()
         row["llm_latency"] = metrics.llm_latency()
         row["tts_startup_latency"] = metrics.tts_startup_latency()
         row["total_response_latency"] = metrics.total_response_latency()
         row["total_turn_duration"] = metrics.total_turn_duration()
-        self._records.append(row)  # type: ignore[arg-type]
+        self._records.append(row)
         logger.info("metrics_recorded", **{k: v for k, v in row.items() if k != "turn_id"})
 
     def summary(self) -> dict[str, dict[str, float | None]]:
@@ -53,9 +54,12 @@ class MetricsCollector:
             "total_response_latency",
             "total_turn_duration",
         ]
-        result: dict[str, dict[str, float | None]] = {}
+        result: dict[str, dict[str, float | None | int]] = {}
         for stage in stages:
-            vals = [r[stage] for r in self._records if isinstance(r.get(stage), float)]
+            vals: list[float] = cast(
+                list[float],
+                [r[stage] for r in self._records if isinstance(r.get(stage), float)],
+            )
             result[stage] = {
                 "p50": _percentile(vals, 50),
                 "p95": _percentile(vals, 95),

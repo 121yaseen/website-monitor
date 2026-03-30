@@ -21,7 +21,7 @@ class LLMAdapter(ABC):
         ...
 
     @abstractmethod
-    async def stream(
+    def stream(
         self,
         system_prompt: str,
         turns: list[Turn],

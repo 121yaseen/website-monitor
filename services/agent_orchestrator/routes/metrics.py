@@ -7,7 +7,7 @@ router = APIRouter()
 
 
 class MetricsSummaryResponse(BaseModel):
-    summary: dict
+    summary: dict[str, dict[str, float | None | int]]
 
 
 @router.get("/metrics", response_model=MetricsSummaryResponse)

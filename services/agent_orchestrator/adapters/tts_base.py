@@ -10,7 +10,7 @@ class TTSAdapter(ABC):
     """Abstract TTS adapter.  Concrete implementations wrap a specific provider."""
 
     @abstractmethod
-    async def synthesize(self, text: str) -> AsyncGenerator[bytes, None]:
+    def synthesize(self, text: str) -> AsyncGenerator[bytes, None]:
         """Yield raw audio chunks (PCM or encoded) for the given text."""
         ...
 

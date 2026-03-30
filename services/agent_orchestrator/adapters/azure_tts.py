@@ -31,10 +31,7 @@ class AzureTTSAdapter(TTSAdapter):
 
     async def synthesize(self, text: str) -> AsyncGenerator[bytes, None]:
         self._cancel_event.clear()
-        endpoint = (
-            f"https://{self._region}.tts.speech.microsoft.com"
-            "/cognitiveservices/v1"
-        )
+        endpoint = f"https://{self._region}.tts.speech.microsoft.com/cognitiveservices/v1"
         ssml = _SSML_TEMPLATE.format(voice=self._voice, text=text)
         headers = {
             "Ocp-Apim-Subscription-Key": self._key,
@@ -44,7 +41,9 @@ class AzureTTSAdapter(TTSAdapter):
         }
         logger.info("tts_request", chars=len(text), voice=self._voice)
         async with httpx.AsyncClient(timeout=30.0) as client:
-            async with client.stream("POST", endpoint, headers=headers, content=ssml.encode()) as resp:
+            async with client.stream(
+                "POST", endpoint, headers=headers, content=ssml.encode()
+            ) as resp:
                 resp.raise_for_status()
                 first_chunk = True
                 async for chunk in resp.aiter_bytes(chunk_size=4096):

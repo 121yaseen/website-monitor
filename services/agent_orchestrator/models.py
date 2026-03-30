@@ -14,12 +14,11 @@ Incoming events from STT layer (forwarded by client or bridged directly):
 
 from __future__ import annotations
 
+import time
+import uuid
 from typing import Literal
 
 from pydantic import BaseModel, Field
-import time
-import uuid
-
 
 # ---------------------------------------------------------------------------
 # Session state machine
@@ -213,6 +212,7 @@ class OrchestratorSessionEndEvent(BaseModel):
 
 class UserBargeInEvent(BaseModel):
     """Signal that the user has started speaking during assistant playback."""
+
     type: Literal["user.barge_in"] = "user.barge_in"
     session_id: str
     timestamp: float = Field(default_factory=time.time)

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 
@@ -34,6 +33,7 @@ def print_table(summary: dict) -> None:
 
 def from_url(url: str) -> None:
     import urllib.request
+
     with urllib.request.urlopen(url, timeout=5) as resp:
         data = json.loads(resp.read())
     print_table(data.get("summary", data))

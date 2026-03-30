@@ -21,6 +21,7 @@ from fastapi.websockets import WebSocket
 
 from services.agent_orchestrator.adapters.llm_base import LLMAdapter
 from services.agent_orchestrator.adapters.tts_base import TTSAdapter
+from services.agent_orchestrator.metrics import collector
 from services.agent_orchestrator.models import (
     AssistantAudioChunkEvent,
     AssistantAudioCompletedEvent,
@@ -33,8 +34,6 @@ from services.agent_orchestrator.models import (
     TurnLatencyMetrics,
     UserFinalTranscriptEvent,
 )
-
-from services.agent_orchestrator.metrics import collector
 
 logger = structlog.get_logger("agent_orchestrator.orchestrator")
 
@@ -170,9 +169,7 @@ class Orchestrator:
             log.info("llm_call_start", context_turns=len(context_turns))
 
             metrics.llm_request_ts = time.time()
-            assistant_text = await self._llm.complete(
-                self._session.system_prompt, context_turns
-            )
+            assistant_text = await self._llm.complete(self._session.system_prompt, context_turns)
             metrics.llm_response_ts = time.time()
             log.info(
                 "llm_response_received",
@@ -283,6 +280,7 @@ class Orchestrator:
 
     async def _send_json(self, data: dict[str, Any]) -> None:
         import json
+
         try:
             await self._ws.send_text(json.dumps(data))
         except Exception as exc:

@@ -47,7 +47,9 @@ class OpenAILLMAdapter(LLMAdapter):
 
     async def complete(self, system_prompt: str, turns: list[Turn]) -> str:
         messages = _turns_to_messages(system_prompt, turns)
-        logger.info("llm_request", model=self._model, turn_count=len(turns), is_azure=self._is_azure)
+        logger.info(
+            "llm_request", model=self._model, turn_count=len(turns), is_azure=self._is_azure
+        )
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self._base_url}/chat/completions",
@@ -65,9 +67,7 @@ class OpenAILLMAdapter(LLMAdapter):
             logger.info("llm_response", chars=len(text))
             return text
 
-    async def stream(
-        self, system_prompt: str, turns: list[Turn]
-    ) -> AsyncGenerator[str, None]:
+    async def stream(self, system_prompt: str, turns: list[Turn]) -> AsyncGenerator[str, None]:
         messages = _turns_to_messages(system_prompt, turns)
         async with httpx.AsyncClient(timeout=60.0) as client:
             async with client.stream(
@@ -93,4 +93,3 @@ class OpenAILLMAdapter(LLMAdapter):
                         content = delta.get("content", "")
                         if content:
                             yield content
-
